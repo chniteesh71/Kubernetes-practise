@@ -1,0 +1,921 @@
+Kubernetes
+K8 is Container Orchestration tool. 
+can run containers on multiple worker nodes or if any one worker node/docker engine fails, the containers will migrate to 
+healthy worker nodes. This is called container Orchestration.
+CLustering of docker engines - multiple docker nodes
+
+
+Container Orchestration tools ::
+Docker Swarm, Kubernetes, AWS EKS & ECS, Mesosphere Marathon , Azure container service, Google container engine, OpenShift, Nomad
+
+K8 architecture:
+Control Node/Master Node/Orchestrator : Kubeapi server, etcd, scheduler, Controller manager
+Worker node/Docker nodes : Kubelet, container runtime, Proxy
+
+Master Node::
+KubeAPI sever ::
+handles all the incoming and outgoing requests. Frontend of control plane.
+Using kubectl can connect to master node (api server)
+
+ETCD server::
+Stores all the information
+Kubeapi stores retrieves info from etcd
+should be backed up regularly.
+
+Kube scheduler::
+It assign a new worker node for a newly created pod.
+scheduling desicions taken based on 
+. resource requirements
+. hardware/software/policy constraints
+. affinity and anti affinity rules
+
+Controller Manager::
+Logically each controller is a separate process.
+To reduce complexity they all are combined into single binary and run in a single process
+Node controller, Replication controller, endpoint controller, Service account & token controller.
+
+Worker node::
+
+Kubelet : 
+Agent running on each node which makes sure that containers are running in a pod.
+Kube proxy :
+Network proxy that runs on each node in your cluster
+Network rule : rules allow network communication to your pods inside or outside of your cluster.
+Container runtime : docker, containerd, rktlet
+
+Objects::
+1. Pod
+2. Replica set
+3. Service --> Nodeport, Load Balancer, Cluster IP
+4. Deployment --> most used by devops
+5. Secret
+6. ConfigMap
+7. Ingress
+
+Create a K8 cluster using Kops/AWS EKS, Azure AKS, Google K8 cluster.
+Try using Google k8 cluster as it provides the free credits.
+
+
+Pod:
+Imperative way::
+Syntax::
+kubectl run <pod-name> --image=<image name in dockerhub>
+eg:
+kubectl run pod-name --image=imranvisualpath/freshtomapp:V7
+kubectl run ubuntu-pod --image=ubuntu 
+kubectl run pod-name12 --image=imranvisualpath/freshtomapp:V7
+kubectl explain pod
+kubectl get pod pod -o yaml
+
+Another image can be used which is same one but it in private repo 
+chniteesh71/vprofilewebapp:v1
+This can be accessed by creating a secret which can store the docker credentials in a safe way.
+
+Declarative way::
+---
+apiVersion : v1
+kind : Pod
+metadata :
+   name : pod-name
+   labels :
+       mainatainer : Niteesh
+       cluster : k8-gcp
+spec : 
+   containers: 
+      - name : container-name
+        image : imranvisualpath/freshtomapp:V7
+        ports:
+          - name : port-name
+            containerPort : 8080
+
+if private image needs to be accessed, -->
+
+echo -n 'dockerhubpassword' | base64
+<encoded-text> will be generated. copy the encoded-text and paste it below command
+kubectl create secret docker-registry regcred --docker-server=https://index.docker.io/v1/ --docker-username=<username> --docker-password=<encoded-password> --docker-email=<email>
+echo '<encoded text> | base64 --decode
+
+---
+apiVersion : v1
+kind : Pod
+metadata :
+   name : pod-name
+   labels :
+       mainatainer : Niteesh
+       cluster : k8-gcp
+spec : 
+   containers: 
+      - name : container-name
+        image : imranvisualpath/freshtomapp:V7
+        ports:
+          - name : port-name
+            containerPort : 8080
+   imagePullSecrets:
+           - name : regcred
+
+
+
+Service::
+
+Three types of services ::
+Nodeport
+Loadbalancer --> Most used
+CLuster IP --> Mostly used for internal communication
+
+Imperative way :
+kubectl expose pod <pod-name> --type=LoadBalancer --port=80
+kubectl expose pod <pod-name> --type=NodePort --port=80
+kubectl expose deployment <deployment-name> --type=LoadBalancer --port=80
+
+services/deployments can be created like below::
+kubectl create service nodeport <service-name> --tcp=2525:8080
+kubectl create service LoadBalancer <service-name> --tcp=2525:8080
+
+2525 is the Loadbalancer port
+Loadbalancerip:2525
+
+Node-port::
+apiversion : v1
+kind : Service
+metadata : 
+    name : node-port-service
+    labels :
+       maintainer : Niteesh
+       Cluster : K8
+spec :
+   type : NodePort
+   ports : 
+      - targetport : port-name
+        nodePort : 30001
+        port : 80
+        protocol : TCP
+   selector : 
+      Cluster : K8
+
+Load Balancer:::
+
+apiVersion : v1
+kind : Service
+metadata : 
+   name : Load-balancer-service
+   labels :
+      maintainer : Niteesh
+      cluster : k8-gcp
+spec:
+    type : LoadBalancer
+    ports :
+      - targetPort : port-name
+        port : 80
+        protocol : TCP
+    selector : 
+        cluster : k8-gcp
+
+Replica-set::
+Declarative way:
+apiVersion : apps/v1
+kind : ReplicaSet
+metadata : 
+   name : replicaset-name
+   labels :
+       maintainer : Niteesh
+       cluster : k8-gcp
+spec :
+  replicas : 5
+  selector:
+    matchLabels:
+      cluster : k8-gcp
+  template :
+     metadata : 
+         name : pod-name
+         labels : 
+            mainatainer : Niteesh
+            cluster : k8-gcp
+     spec :
+        containers :
+             - name : container-name
+               image : chniteesh71/vprofilewebapp:v1
+               ports :
+                 - name : port-name
+                   containerPort : 8080
+        imagePullSecrets:
+           - name : regcred
+
+
+Deployment::
+Imperative way::
+kubectl create deployment  deployment-ex1 --image=imranvisualpath/freshtomapp:V7 --replicas=5
+kubectl expose deployment  deployment-ex1 --type=LoadBalancer --port=8080
+
+
+Declarative way ::
+
+vim deployment.yaml
+apiVersion : apps/v1
+kind : Deployment
+metadata : 
+   name : deployment-ex
+   labels :
+       maintainer : Niteesh
+       cluster : k8-gcp
+spec :
+  replicas : 5
+  selector:
+    matchLabels:
+      cluster : k8-gcp
+  template :
+     metadata : 
+         name : pod-name
+         labels : 
+            mainatainer : Niteesh
+            cluster : k8-gcp
+     spec :
+        containers :
+             - name : container-name
+               image : chniteesh71/vprofilewebapp:v1
+               ports :
+                 - name : port-name
+                   containerPort : 8080
+        imagePullSecrets:
+           - name : regcred
+
+kubectl apply -f deployment.yaml
+or
+kubectl create -f deployment.yaml
+kubectl get rs
+kubectl get pods
+kubectl get deploy
+kubectl get svc
+
+example 2: for practise
+vim nginx-deployment.yaml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+  labels:
+    app: nginx
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:1.14.2
+        ports:
+        - containerPort: 8080
+        
+kubectl apply -f https://k8s.io/examples/controllers/nginx-deployment.yaml
+
+kubectl get deploy
+kubectl get rs
+kubectl get pods
+kubectl describe pod <pod-name>
+
+Updating  the image :
+kubectl set image deployment.v1.apps/nginx-deployment nginx=nginx:1.16.1
+or 
+kubectl set image deployment/nginx-deployment nginx=nginx:1.16.1
+
+or edit the deployemnt.yaml file
+
+kubectl rollout status deployment/nginx-deployment
+kubectl get rs
+kubectl describe deployments
+kubectl rollout history deployment/nginx-deployment
+kubectl rollout undo deployment/nginx-deployment
+kubectl rollout undo deployment/nginx-deployment --to-revision=2
+kubectl get deployment nginx-deployment
+kubectl scale deployment/nginx-deployment --replicas=10
+kubectl autoscale deployment/nginx-deployment --min=10 --max=15 --cpu-percent=80
+
+
+ConfigMaps:
+With configMaps and Secrets you can create individual key:value pairs, files that can be mounted in a pod.
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: game-demo
+data:
+  # property-like keys; each key maps to a simple value
+  player_initial_lives: "3"
+  ui_properties_file_name: "user-interface.properties"
+
+  # file-like keys
+  game.properties: |
+    enemy.types=aliens,monsters
+    player.maximum-lives=5    
+  user-interface.properties: |
+    color.good=purple
+    color.bad=yellow
+    allow.textmode=true    
+
+
+pod def:
+apiVersion: v1
+kind: Pod
+metadata:
+  name: configmap-demo-pod
+spec:
+  containers:
+    - name: demo
+      image: alpine
+      command: ["sleep", "3600"]
+      env:
+        # Define the environment variable
+        - name: PLAYER_INITIAL_LIVES # Notice that the case is different here
+                                     # from the key name in the ConfigMap.
+          valueFrom:
+            configMapKeyRef:
+              name: game-demo           # The ConfigMap this value comes from.
+              key: player_initial_lives # The key to fetch.
+        - name: UI_PROPERTIES_FILE_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: game-demo
+              key: ui_properties_file_name
+      volumeMounts:
+      - name: config
+        mountPath: "/config"
+        readOnly: true
+  volumes:
+  # You set volumes at the Pod level, then mount them into containers inside that Pod
+  - name: config
+    configMap:
+      # Provide the name of the ConfigMap you want to mount.
+      name: game-demo
+      # An array of keys from the ConfigMap to create as files
+      items:
+      - key: "game.properties"
+        path: "game.properties"
+      - key: "user-interface.properties"
+        path: "user-interface.properties"
+
+
+Mosquitto example for configmaps and secrets::
+
+mosquitto_without_volumes :
+vim mosquitto_without_volumes.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mosquitto
+  labels:
+    app: mosquitto
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mosquitto
+  template:
+    metadata:
+      labels:
+        app: mosquitto
+    spec:
+      containers:
+        - name: mosquitto
+          image: eclipse-mosquitto:1.6.2
+          ports:
+            - containerPort: 1883
+
+
+vim secret_mos.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mosquitto-secret-file
+type: Opaque
+data:
+  secret.file: |
+    c29tZXN1cGVyc2VjcmV0IGZpbGUgY29udGVudHMgbm9ib2R5IHNob3VsZCBzZWU=
+
+vim ConfigMap_mos.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mosquitto-config-file
+data:
+  mosquitto.conf: |
+    log_dest stdout
+    log_type all
+    log_timestamp true
+    listener 9001
+
+
+mosquitto_with_volumes
+
+vim mosquitto_with_volumes.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mosquitto
+  labels:
+    app: mosquitto
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mosquitto
+  template:
+    metadata:
+      labels:
+        app: mosquitto
+    spec:
+      containers:
+        - name: mosquitto
+          image: eclipse-mosquitto:1.6.2
+          ports:
+            - containerPort: 1883
+          volumeMounts:
+            - name: mosquitto-conf
+              mountPath: /mosquitto/config
+            - name: mosquitto-secret
+              mountPath: /mosquitto/secret  
+              readOnly: true
+      volumes:
+        - name: mosquitto-conf
+          configMap:
+            name: mosquitto-config-file
+        - name: mosquitto-secret
+          secret:
+            secretName: mosquitto-secret-file  
+
+
+kubectl apply -f mosquitto_without_volumes.yaml
+kubectl get pods
+kubectl exec -it <podname> -- /bin/bash
+kubectl exec -it mosquitto-7bf54f79b4-678jg -- /bin/sh --> if bash doesnt work use sh
+ls
+cd mosquitto
+ls
+cd config
+ls
+cat mosquitto.conf --> pre configured file from the image.
+exit
+
+kubectl delete -f mosquitto_without_volumes.yaml
+
+
+overwriting the mosquitto.conffile using configmap.
+ConfigMap and secret must be created before pod creation/deployment.
+kubectl apply -f ConfigMap_mos.yaml
+kubectl apply -f secret_mos.yaml
+kubectl get cm
+kubectl get secret
+kubectl apply -f mosquitto_with_volumes.yaml
+kubectl get pod
+kubectl exec -it mosquitto-7c7b4c69df-hw2m7 -- /bin/sh
+   0 ls
+   1 cd mosquitto
+   2 ls
+   3 cd config
+   4 ls
+   5 cd mosquitto.conf
+   6 cat mosquitto.conf
+   7 ls
+   8 cd ..
+   9 ls
+  10 cd secret
+  11 ls
+  12 cat secret.file
+
+
+Ingress::
+
+An API object that manages external access to the services in a cluster, typically HTTP.
+Ingress may provide load balancing, SSL termination and name-based virtual hosting.
+Ingress exposes HTTP and HTTPS routes from outside the cluster to services within the cluster.
+cluster : pod <-- External service <-- external request
+for external request to reach into pod, a service of type Loadbalancer/Nodeport will be there.
+But this is of IP address like http://ipaddress-of-LoadBalancer:port
+incase of Node port : http://ipaddress-of-workernode:port
+This is for testing.
+
+for production :: Domain name should be there and a secure connection like https should be present.
+ex : https://my-app.com
+
+cluster : pod <-- Internal service <-- Ingress <-- Ingress managed Load-Balancer <-- External request
+Ip address and port is not opened.
+So external request goes to Ingress.
+Ingress routes the request to Internal service which is of ClusterIP
+
+Ingress controller should be installed which is another pod.
+- evaluates all the rules
+- manages redirections
+- entrypoint to cluster
+
+Network Load balancer will be there infront of ingress controller.
+
+Ingress example
+###STEPS###
+# Create Controller
+# Create Deployment
+# Create Service
+# Create DNS Cname Record for LB
+# Create Ingress
+# Test
+
+# Create controller
+For NLB : Network Load Balancer
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.1.3/deploy/static/provider/aws/deploy.yaml
+
+kubectl get ns
+kubectl get all -n ingress-nginx
+
+chniteesh71@cloudshell:~$ kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.1.3/deploy/static/provider/aws/deploy.yaml
+namespace/ingress-nginx created
+serviceaccount/ingress-nginx created
+serviceaccount/ingress-nginx-admission created
+role.rbac.authorization.k8s.io/ingress-nginx created
+role.rbac.authorization.k8s.io/ingress-nginx-admission created
+clusterrole.rbac.authorization.k8s.io/ingress-nginx created
+clusterrole.rbac.authorization.k8s.io/ingress-nginx-admission created
+rolebinding.rbac.authorization.k8s.io/ingress-nginx created
+rolebinding.rbac.authorization.k8s.io/ingress-nginx-admission created
+clusterrolebinding.rbac.authorization.k8s.io/ingress-nginx created
+clusterrolebinding.rbac.authorization.k8s.io/ingress-nginx-admission created
+configmap/ingress-nginx-controller created
+service/ingress-nginx-controller created
+service/ingress-nginx-controller-admission created
+deployment.apps/ingress-nginx-controller created
+job.batch/ingress-nginx-admission-create created
+job.batch/ingress-nginx-admission-patch created
+ingressclass.networking.k8s.io/nginx created
+validatingwebhookconfiguration.admissionregistration.k8s.io/ingress-nginx-admission created
+
+
+# Create Deployment
+vim vprodep.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-app
+spec:
+  selector:
+    matchLabels:
+      run: my-app
+  replicas: 3
+  template:
+    metadata:
+      labels:
+        run: my-app
+    spec:
+      containers:
+      - name: my-app
+        image: imranvisualpath/vproappfix
+        ports:
+        - containerPort: 8080
+
+kubectl apply -f vprodep.yaml
+
+
+# Create service
+vim vprosvc.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: my-app
+spec:
+  ports:
+  - port: 8080
+    protocol: TCP
+    targetPort: 8080
+  selector:
+    run: my-app
+  type: ClusterIP
+
+
+kubectl apply -f vprosvc.yaml
+kubectl get svc
+kubectl describe svc my-app
+
+
+# Create DNS Cname Record for LB
+Go to your domain hosted records
+Add CNAME record
+hostname => Load balancer Endpoint URL
+
+
+# Create Ingress
+vim vproingress.yaml
+apiVersion : networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: vpro-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/use-regex: "true"
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: testing.niteesh.xyz
+    http:
+      paths:
+      - path: /login
+        pathType: Prefix
+        backend:
+          service:
+            name: my-app
+            port:
+              number: 8080
+
+kubectl apply -f vproingress.yaml
+
+# Update Path in ingress from /login to /
+kubectl get ingress
+kubectl delete ingress vpro-ingress
+vim vproingress.yaml
+
+paths:
+  - path: /
+
+kubectl apply -f vproingress.yaml
+kubectl get ingress
+kubectl get ingress --watch
+clear
+kubectl get ns
+
+
+
+Helm and Helm-charts::
+
+Helm :
+Package manager for Kubernetes
+ex : yum for Rhel, centos...
+     apt for ubuntu
+In the same way, Helm is a package manager for Kubernetes.
+
+To package the kubernetes yaml files(service.yaml, deployment.yaml, pod.yaml.....) and distribute them in 
+public and private repositories.
+
+Helm charts :
+Bundle of yaml files is called helm charts
+Create your own helm charts using helm.
+Push them into Helm repository.
+download and use existing charts
+
+
+Sharing Helm-charts
+
+Need some deployment using the below command in cmd you can use existing helm charts
+cmd line ::
+helm search <keyword>
+or
+helmhub --> public repo 
+and private repos will be there within organisation
+
+
+--> Templating engine. 
+if you want top deploy a microservices in a cluster. You have to write 5-10 yaml files but with helm charts, you can -
+1. Define common blueprint 
+2. Dynamic values are replaced by placeholders --> like variables in terraform.
+
+same application in different environments.
+production, Developement, staging,..
+Can use the same helm-charts which are created in developement. can be copied to staging and production clusters.\
+
+helm charts structure :
+Directory structure::
+mychart/
+    chart.yaml  --> meta info about chart
+    values.yaml --> values are configured for template files. can overwrite later according to request.
+    charts/     --> chart dependencies
+    templates/  --> The actual templates files.
+    ...
+    
+
+helm install <chart-name>
+template files will be filled with values from values.yaml
+values.yaml
+my-values.yaml
+
+helm install --set version=2.0.0
+
+
+--> Release mangement::
+
+helm 2 vs helm 3
+helm 2 comes in 2 parts
+client(helm cli) to server(Tiller)
+
+keeps track of all chart execution.
+
+helm install <chart-name>
+helm upgrade <chart-name> --> instead of creating new deployement, changes are applied to existing deployment
+helm rollback <chart-name>
+
+
+Downsides:
+Tiller has too much power inside the kubernetes cluster(create,update,delete)
+helm2 has tiller which makes a security issue. So they removed the tiller in helm 3 but difficult to use.
+
+
+Helm-practise 1::
+https://www.youtube.com/watch?v=jUYNS90nq8U
+
+helm create Niteesh1
+cd Niteesh1
+deafult ones...
+chniteesh71@cloudshell:~/helm/Niteesh1$ ls templates/
+deployment.yaml  _helpers.tpl  hpa.yaml  ingress.yaml  NOTES.txt  serviceaccount.yaml  service.yaml  tests
+helm version
+Usage:
+  helm [command]
+
+Available Commands:
+  completion  generate autocompletion scripts for the specified shell
+  create      create a new chart with the given name
+  dependency  manage a chart's dependencies
+  env         helm client environment information
+  get         download extended information of a named release
+  help        Help about any command
+  history     fetch release history
+  install     install a chart
+  lint        examine a chart for possible issues
+  list        list releases
+  package     package a chart directory into a chart archive
+
+rm -rf *
+replace the templates with the templates available in templates-original
+
+outside of helm charts created earlier
+helm install <give a name> <path to helm charts created previously>
+helm install mywebapp-release Niteesh1/
+kubectl get all
+minikube tunnel
+
+
+using values....
+
+vim configmap.yaml
+kind: ConfigMap 
+apiVersion: v1 
+metadata:
+  name: {{ .Values.configmap.name }}
+  namespace: {{ .Values.namesapce }}
+data:
+  BG_COLOR: '#12181b'
+  FONT_COLOR: '#FFFFFF'
+  CUSTOM_HEADER: {{ .Values.configmap.data.CUSTOM_HEADER }}
+
+
+vim deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.appName }}
+  namespace: {{ .Values.namesapce }}
+  labels:
+    app: {{ .Values.appName }}
+spec:
+  replicas: 5
+  selector:
+    matchLabels:
+      app: {{ .Values.appName }}
+      tier: frontend
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.appName }}
+        tier: frontend
+    spec: # Pod spec
+      containers:
+      - name: mycontainer
+        image: "{{ .Values.image.name }}:{{ .Values.image.tag }}"
+        ports:
+        - containerPort: 80
+        envFrom:
+        - configMapRef:
+            name: {{ .Values.configmap.name }}
+        resources:
+          requests:
+            memory: "16Mi" 
+            cpu: "50m"    # 50 milli cores (1/20 CPU)
+          limits:
+            memory: "128Mi" # 128 mebibytes 
+            cpu: "100m"
+
+
+vim service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.appName }}
+  namespace: {{ .Values.namesapce }}
+  labels:
+    app: {{ .Values.appName }}
+spec:
+  ports:
+  - port: 80
+    protocol: TCP
+    name: flask
+  selector:
+    app: {{ .Values.appName }}
+    tier: frontend
+  type: LoadBalancer
+
+vim values.yaml
+gg
+1000dd
+i
+appName : myhelmapp
+namespace : default
+configmap
+   name : helmappconfigmapv1.1
+   data :
+      CUSTOM_HEADER : THIS APP DEPLOYED WITH HELM
+
+image :
+   name : devopsjourney1/mywebapp
+   tag : latest
+
+helm upgrade mywebapp-release Niteesh1/ --values Niteesh1/values.yaml
+helm upgrade mywebapp-release Niteesh1/ --values Niteesh1/values.yaml
+
+
+helm upgrade mywebapp-release Niteesh1/ --values Niteesh1/values.yaml
+
+vim values-dev.yaml
+namespace : dev
+
+configmap :
+   data :
+      CUSTOM_HEADER : "Welcome to DEV Environment!"
+
+vim values-prod.yaml
+namespace : prod
+  
+configmap :
+   data :
+      CUSTOM_HEADER : "Welcome to Prod  Environment!"
+
+kubectl create namespace dev
+kubectl create namespace prod
+
+helm  install mywebapp-release-dev Niteesh1/ --values Niteesh1/values.yaml -f Niteesh1/values-dev.yaml -n dev
+helm  install mywebapp-release-prod Niteesh1/ --values Niteesh1/values.yaml -f Niteesh1/values-prod.yaml -n prod
+helm ls --all-namespaces
+
+practise 2:
+helm create app-deployment
+
+vim deployment.yaml
+apiVersion : apps/v1
+kind : Deployment
+metadata : 
+   name : deployment-ex
+   labels :
+       maintainer : Niteesh
+       cluster : k8-gcp
+spec :
+  replicas : 5
+  selector:
+    matchLabels:
+      cluster : k8-gcp
+  template :
+     metadata : 
+         name : pod-name
+         labels : 
+            mainatainer : Niteesh
+            cluster : k8-gcp
+     spec :
+        containers :
+             - name : container-name
+               image : chniteesh71/vprofilewebapp:v1
+               ports :
+                 - name : port-name
+                   containerPort : 8080
+        imagePullSecrets:
+           - name : regcred
+
+
+vim load-balancer.yaml
+---
+apiVersion : v1
+kind : Service
+metadata : 
+   name : load-balancerservice
+   labels :
+      maintainer : Niteesh
+      cluster : k8-gcp
+spec:
+    type : LoadBalancer
+    ports :
+      - targetPort : port-name
+        port : 80
+        protocol : TCP
+    selector : 
+        cluster : k8-gcp
+
+
+helm install myappdeploy /app-deployment
+
+Follow the same procedure for helm practise 1.
+
+
